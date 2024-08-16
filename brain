@@ -1,0 +1,63 @@
+# Proxy Server Implementation in Java
+
+import java.io.*;
+import java.net.*;
+
+public class SimpleProxy {
+    public static void main(String[] args) {
+        int port = 8080; // Port for the proxy server
+        try (ServerSocket serverSocket = new ServerSocket(port)) {
+            System.out.println("Proxy server is running on port " + port);
+            while (true) {
+                Socket clientSocket = serverSocket.accept();
+                new Thread(new ProxyThread(clientSocket)).start();
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+}
+
+class ProxyThread implements Runnable {
+    private Socket clientSocket;
+
+    public ProxyThread(Socket clientSocket) {
+        this.clientSocket = clientSocket;
+    }
+
+    @Override
+    public void run() {
+        try (BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+             PrintWriter out = new PrintWriter(clientSocket.getOutputStream(), true)) {
+
+            String requestLine = in.readLine();
+            if (requestLine != null) {
+                System.out.println("Request: " + requestLine);
+                String[] requestParts = requestLine.split(" ");
+                String method = requestParts[0];
+                String url = requestParts[1];
+
+                // Connect to the target server
+                URL targetUrl = new URL(url);
+                HttpURLConnection connection = (HttpURLConnection) targetUrl.openConnection();
+                connection.setRequestMethod(method);
+
+                // Read response from the target server
+                BufferedReader responseReader = new BufferedReader(new InputStreamReader(connection.getInputStream()));
+                String responseLine;
+                while ((responseLine = responseReader.readLine()) != null) {
+                    out.println(responseLine);
+                }
+                responseReader.close();
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                clientSocket.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+}
